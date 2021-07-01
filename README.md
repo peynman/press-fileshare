@@ -13,11 +13,10 @@ Remote and Local file upload/download for Laravel.
 
 ## Install
 
-1. `composer require peynman/larapress-livestream`
+1. `composer require peynman/larapress-fileshare`
 
 ## Config
 
-1. Publish config `php artisan vendor:publish --tag=larapress-livestream`
-1. Create/Update AdobeConnect product type `php artisan lp:livestream:create-pc`
+1. Publish config `php artisan vendor:publish --tag=larapress-fileshare`
 
 ## Usage

@@ -52,6 +52,6 @@ class FileUpload extends Model
      */
     public function uploader()
     {
-        return $this->belongsTo(config('larapress.crud.user.class'), 'uploader_id');
+        return $this->belongsTo(config('larapress.crud.user.model'), 'uploader_id');
     }
 }

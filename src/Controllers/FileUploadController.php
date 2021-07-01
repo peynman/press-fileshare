@@ -4,7 +4,7 @@ namespace Larapress\FileShare\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Larapress\CRUD\Services\CRUD\BaseCRUDController;
+use Larapress\CRUD\Services\CRUD\CRUDController;
 use Larapress\CRUD\Middleware\CRUDAuthorizeRequest;
 use Larapress\FileShare\CRUD\FileUploadCRUDProvider;
 use Larapress\FileShare\Services\FileUpload\FileUploadRequest;
@@ -16,14 +16,14 @@ use Larapress\FileShare\Services\FileUpload\IFileUploadService;
  *
  * @group File Uploads
  */
-class FileUploadController extends BaseCRUDController
+class FileUploadController extends CRUDController
 {
     public static function registerRoutes()
     {
         parent::registerCrudRoutes(
             config('larapress.fileshare.routes.file_upload.name'),
             self::class,
-            FileUploadCRUDProvider::class,
+            config('larapress.fileshare.routes.file_upload.provider'),
             [
                 'upload.update' => [
                     'methods' => ['POST'],

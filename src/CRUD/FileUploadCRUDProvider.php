@@ -2,29 +2,29 @@
 
 namespace Larapress\FileShare\CRUD;
 
-use Illuminate\Database\Query\Builder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
-use Larapress\CRUD\Services\CRUD\BaseCRUDProvider;
+use Larapress\CRUD\Services\CRUD\Traits\CRUDProviderTrait;
 use Larapress\CRUD\Services\CRUD\ICRUDProvider;
 use Larapress\CRUD\Services\RBAC\IPermissionsMetadata;
 use Larapress\CRUD\ICRUDUser;
-use Larapress\FileShare\Models\FileUpload;
+use Larapress\CRUD\Services\CRUD\ICRUDVerb;
 use Larapress\Profiles\IProfileUser;
-use Larapress\Profiles\Models\Domain;
 use Larapress\Profiles\Models\FormEntry;
 use Larapress\ECommerce\IECommerceUser;
+use Larapress\FileShare\Models\FileUpload;
 
 /**
  * File Uploading.
  * This provides a file upload and download resource.
  */
-class FileUploadCRUDProvider implements ICRUDProvider, IPermissionsMetadata
+class FileUploadCRUDProvider implements ICRUDProvider
 {
-    use BaseCRUDProvider;
+    use CRUDProviderTrait;
 
     public $name_in_config = 'larapress.fileshare.routes.file_upload.name';
-    public $extend_in_config = 'larapress.fileshare.routes.file_upload.extend.providers';
-    public $model = FileUpload::class;
+    public $model_in_config = 'larapress.fileshare.routes.file_upload.model';
+    public $compositions_in_config = 'larapress.fileshare.routes.file_upload.compositions';
 
     /**
      * @view View file details.
@@ -33,8 +33,8 @@ class FileUploadCRUDProvider implements ICRUDProvider, IPermissionsMetadata
      * @upload-update Upload on existing file
      */
     public $verbs = [
-        self::VIEW,
-        self::DELETE,
+        ICRUDVerb::VIEW,
+        ICRUDVerb::DELETE,
         'upload',
     ];
 
@@ -55,13 +55,6 @@ class FileUploadCRUDProvider implements ICRUDProvider, IPermissionsMetadata
     ];
 
     /**
-     * @bodyParam uploader Show uploader details.
-     */
-    public $validRelations = [
-        'uploader',
-    ];
-
-    /**
      * @bodyParam created_from datetime Show files uploaded after date.
      * @bodyParam created_to datetime Show files uploaded before date.
      * @bodyParam uploader_id int Show files uploaded by specific user.
@@ -75,31 +68,43 @@ class FileUploadCRUDProvider implements ICRUDProvider, IPermissionsMetadata
     ];
 
     /**
+     * @bodyParam uploader Show uploader details.
+     *
+     * @return array
+     */
+    public function getValidRelations(): array
+    {
+        return [
+            'uploader' => config('larapress.crud.user.provider'),
+        ];
+    }
+
+    /**
      * @param Builder $query
      *
-     * @return \Illuminate\Database\Query\Builder
+     * @return Builder
      */
-    public function onBeforeQuery($query)
+    public function onBeforeQuery(Builder $query): Builder
     {
         /** @var IProfileUser|ICRUDUser $user */
         $user = Auth::user();
-        if (!$user->hasRole(config('larapress.profiles.security.roles.super-role'))) {
-            $query->where('uploader_id', $user->id);
+        if (!$user->hasRole(config('larapress.profiles.security.roles.super_role'))) {
+            $query->onWhere('uploader_id', $user->id);
         }
 
         return $query;
     }
 
     /**
-     * @param Domain $object
+     * @param FileUpload $object
      *
      * @return bool
      */
-    public function onBeforeAccess($object)
+    public function onBeforeAccess($object): bool
     {
         /** @var IECommerceUser $user */
         $user = Auth::user();
-        if (!$user->hasRole(config('larapress.profiles.security.roles.super-role'))) {
+        if (!$user->hasRole(config('larapress.profiles.security.roles.super_role'))) {
             if (!is_null(config('larapress.lcms.teacher_support_form_id')) &&
                 $user->hasRole(config('larapress.lcms.owner_role_id'))
             ) {

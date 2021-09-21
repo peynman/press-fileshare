@@ -6,12 +6,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Larapress\CRUD\Services\CRUD\Traits\CRUDProviderTrait;
 use Larapress\CRUD\Services\CRUD\ICRUDProvider;
-use Larapress\CRUD\Services\RBAC\IPermissionsMetadata;
 use Larapress\CRUD\ICRUDUser;
 use Larapress\CRUD\Services\CRUD\ICRUDVerb;
 use Larapress\Profiles\IProfileUser;
 use Larapress\Profiles\Models\FormEntry;
 use Larapress\ECommerce\IECommerceUser;
+use Larapress\FileShare\Controllers\FileUploadController;
 use Larapress\FileShare\Models\FileUpload;
 
 /**
@@ -25,18 +25,6 @@ class FileUploadCRUDProvider implements ICRUDProvider
     public $name_in_config = 'larapress.fileshare.routes.file_upload.name';
     public $model_in_config = 'larapress.fileshare.routes.file_upload.model';
     public $compositions_in_config = 'larapress.fileshare.routes.file_upload.compositions';
-
-    /**
-     * @view View file details.
-     * @destroy Soft delete file from database and remove file link.
-     * @upload Upload new file
-     * @upload-update Upload on existing file
-     */
-    public $verbs = [
-        ICRUDVerb::VIEW,
-        ICRUDVerb::DELETE,
-        'upload',
-    ];
 
     /**
      * Search finds uploaded files with relevant title and/or filename.
@@ -66,6 +54,35 @@ class FileUploadCRUDProvider implements ICRUDProvider
         'uploader_id' => 'equals:uploader_id',
         'mime' => 'in:jpeg,jpg,png,zip,pdf',
     ];
+
+    /**
+     * @view View file details.
+     * @destroy Soft delete file from database and remove file link.
+     * @upload Upload new file
+     * @upload-update Upload on existing file
+     */
+    public function getPermissionVerbs(): array
+    {
+        return [
+            ICRUDVerb::VIEW,
+            ICRUDVerb::DELETE,
+            ICRUDVerb::SHOW => [
+                'methods' => ['GET'],
+                'url' => config('larapress.fileshare.routes.file_upload.name').'/download/{file_id}',
+                'uses' => '\\'.FileUploadController::class.'@downloadFile',
+            ],
+            'upload.update' => [
+                'methods' => ['POST'],
+                'url' => config('larapress.fileshare.routes.file_upload.name').'/{file_id}',
+                'uses' => '\\'.FileUploadController::class.'@overwriteUpload',
+            ],
+            'upload' => [
+                'methods' => ['POST'],
+                'url' => config('larapress.fileshare.routes.file_upload.name'),
+                'uses' => '\\'.FileUploadController::class.'@receiveUpload',
+            ],
+        ];
+    }
 
     /**
      * @bodyParam uploader Show uploader details.

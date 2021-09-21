@@ -15,8 +15,8 @@ use Intervention\Image\Facades\Image;
 use Larapress\CRUD\Events\CRUDVerbEvent;
 use Larapress\CRUD\Exceptions\AppException;
 use Larapress\CRUD\Extend\Helpers;
-use Larapress\ECommerce\CRUD\FileUploadCRUDProvider;
 use Illuminate\Support\Str;
+use Larapress\FileShare\CRUD\FileUploadCRUDProvider;
 
 class FileUploadService implements IFileUploadService
 {
@@ -251,7 +251,7 @@ class FileUploadService implements IFileUploadService
                     'path' => $path,
                     'filename' => $fileName,
                     'storage' => $disk,
-                    'access' => $access,
+                    'access' => $access === 'private' ? 0 : 1,
                     'size' => $fileSize,
                 ]);
             } else {
@@ -263,7 +263,7 @@ class FileUploadService implements IFileUploadService
                     'path' => $path,
                     'filename' => $fileName,
                     'storage' => $disk,
-                    'access' => $access,
+                    'access' => $access === 'private' ? 0 : 1,
                     'size' => $fileSize,
                 ]);
             }
@@ -304,7 +304,7 @@ class FileUploadService implements IFileUploadService
                     'filename' => $filename,
                     'storage' => $disk,
                     'size' => $fileSize,
-                    'access' => $access,
+                    'access' => $access === 'private' ? 0 : 1,
                 ]);
             } else {
                 $fileUpload = $existing;
@@ -316,7 +316,7 @@ class FileUploadService implements IFileUploadService
                     'filename' => $filename,
                     'storage' => $disk,
                     'size' => $fileSize,
-                    'access' => $access,
+                    'access' => $access === 'private' ? 0 : 1,
                 ]);
             }
 
@@ -338,17 +338,16 @@ class FileUploadService implements IFileUploadService
      * @param string $folder
      * @return array
      */
-    public function replaceBase64WithFilePathInArray($values, $prop, $disk = 'public', $folder = 'avatars')
+    public function replaceBase64WithFilePathValuesRecursuve($values, $prop, $disk = 'public', $folder = 'avatars')
     {
         /** @var IFileUploadService */
         $this->fileService = app(IFileUploadService::class);
         $traverse = function ($inputs, $prop, $traverse) use ($disk, $folder) {
             foreach ($inputs as $p => $v) {
-                if (is_string($v) && (Str::startsWith($p, $prop) || Str::endsWith($p, $prop))) {
+                if (is_string($v) && (is_null($prop) || Str::startsWith($p, $prop) || Str::endsWith($p, $prop))) {
                     if (Str::startsWith($inputs[$p], 'data:image/png;base64,')) {
                         try {
                             $filepath = $this->fileService->saveBase64Image($inputs[$p], $disk, $folder);
-                            ;
                             $inputs[$p] = '/storage/' . $filepath;
                         } catch (Exception $e) {
                             Log::critical('Failed auto saving base64 image form: '. $e->getMessage(), $e->getTrace());

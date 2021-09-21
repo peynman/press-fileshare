@@ -31,7 +31,7 @@ class FileUploadRequest extends FormRequest
     public function rules()
     {
         return [
-            'file' => 'required|file',
+            // 'file' => 'required|file',
             'access' => 'required|in:public,private',
             'title' => 'nullable|string',
         ];

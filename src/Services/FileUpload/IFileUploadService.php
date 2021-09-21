@@ -73,5 +73,5 @@ interface IFileUploadService
      * @param string $folder
      * @return array
      */
-    public function replaceBase64WithFilePathInArray($values, $prop, $disk = 'public', $folder = 'avatars');
+    public function replaceBase64WithFilePathValuesRecursuve($values, $prop, $disk = 'public', $folder = 'avatars');
 }

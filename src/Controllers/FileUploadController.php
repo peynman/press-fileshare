@@ -3,49 +3,17 @@
 namespace Larapress\FileShare\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use Larapress\CRUD\Services\CRUD\CRUDController;
-use Larapress\CRUD\Middleware\CRUDAuthorizeRequest;
-use Larapress\FileShare\CRUD\FileUploadCRUDProvider;
+use Illuminate\Routing\Controller;
 use Larapress\FileShare\Services\FileUpload\FileUploadRequest;
 use Larapress\FileShare\Services\FileUpload\IFileUploadService;
 
 
 /**
- * Standard CRUD Controller for FileUpload resource.
  *
  * @group File Uploads
  */
-class FileUploadController extends CRUDController
+class FileUploadController extends Controller
 {
-    public static function registerRoutes()
-    {
-        parent::registerCrudRoutes(
-            config('larapress.fileshare.routes.file_upload.name'),
-            self::class,
-            config('larapress.fileshare.routes.file_upload.provider'),
-            [
-                'upload.update' => [
-                    'methods' => ['POST'],
-                    'url' => config('larapress.fileshare.routes.file_upload.name').'/{file_id}',
-                    'uses' => '\\'.self::class.'@overwriteUpload',
-                ],
-                'upload' => [
-                    'methods' => ['POST'],
-                    'url' => config('larapress.fileshare.routes.file_upload.name'),
-                    'uses' => '\\'.self::class.'@receiveUpload',
-                ],
-            ]
-        );
-    }
-
-    public static function registerWebRoutes()
-    {
-        Route::get(config('larapress.fileshare.routes.file_upload.name').'/download/{file_id}', '\\'.self::class.'@downloadFile')
-            ->middleware(CRUDAuthorizeRequest::class)
-            ->name(config('larapress.fileshare.routes.file_upload.name').'.view.download');
-    }
-
     /**
      * Receive File
      *

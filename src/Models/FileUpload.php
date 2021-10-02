@@ -26,6 +26,9 @@ class FileUpload extends Model
 {
     use SoftDeletes;
 
+    public const ACCESS_PRIVATE = 0;
+    public const ACCESS_PUBLIC = 1;
+
     protected $table = 'file_uploads';
 
     public $incrementing = true;

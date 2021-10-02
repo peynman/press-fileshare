@@ -4,9 +4,10 @@ namespace Larapress\FileShare\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Auth;
 use Larapress\FileShare\Services\FileUpload\FileUploadRequest;
 use Larapress\FileShare\Services\FileUpload\IFileUploadService;
-
+use Larapress\Profiles\IProfileUser;
 
 /**
  *
@@ -25,7 +26,9 @@ class FileUploadController extends Controller
     public function receiveUpload(IFileUploadService $service, FileUploadRequest $request)
     {
         return $service->receiveUploaded($request, function ($file) use ($service, $request) {
-            return $service->processUploadedFile($request, $file);
+            /** @var IProfileUser */
+            $user = Auth::user();
+            return $service->processUploadedFile($user, $request, $file);
         });
     }
 
@@ -43,7 +46,9 @@ class FileUploadController extends Controller
     public function overwriteUpload(IFileUploadService $service, FileUploadRequest $request, $file_id)
     {
         return $service->receiveUploaded($request, function ($file) use ($service, $request) {
-            return $service->processUploadedFile($request, $file);
+            /** @var IProfileUser */
+            $user = Auth::user();
+            return $service->processUploadedFile($user, $request, $file);
         });
     }
 

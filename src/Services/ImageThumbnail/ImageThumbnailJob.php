@@ -14,8 +14,6 @@ use Larapress\FileShare\Services\FileUpload\IFileUploadService;
 use Larapress\Reports\Services\TaskScheduler\ITaskSchedulerService;
 use Intervention\Image\Facades\Image;
 use Intervention\Image\Image as InterventionImage;
-use Illuminate\Support\Str;
-use Larapress\CRUD\Exceptions\AppException;
 
 class ImageThumbnailJob implements ShouldQueue
 {

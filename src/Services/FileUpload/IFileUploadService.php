@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Larapress\FileShare\Models\FileUpload;
 use Larapress\Profiles\IProfileUser;
+use Illuminate\Http\Response;
 
 interface IFileUploadService
 {
@@ -114,32 +115,53 @@ interface IFileUploadService
      * @param Request $request
      * @param int $fileId
      * @param bool $checkAccess
-     * @return void
+     * @return Response
      */
     public function serveFile(Request $request, $fileId, $checkAccess = true);
 
-
     /**
      * Undocumented function
      *
+     * @param IProfileUser $user
+     * @param string $title
      * @param string $encoded
-     * @param string $storage
-     * @param string $folder
+     * @param string $location
+     * @param string $disk
+     * @param integer $access
+     * @param array|null $data
      *
-     * @return bool
+     * @return FileUpload|null
      */
-    public function saveBase64Image($encoded, $storage, $folder);
-
-
+    public function saveBase64Image(
+        IProfileUser $user,
+        string
+        $title,
+        string $encoded,
+        string $location,
+        string $disk,
+        int $access,
+        array|null $data
+    );
 
     /**
      * Undocumented function
      *
+     * @param IProfileUser $user
+     * @param string $title
      * @param array $values
-     * @param string $prop
+     * @param string|null $prop
+     * @param int $access
      * @param string $disk
      * @param string $folder
      * @return array
      */
-    public function replaceBase64WithFilePathValuesRecursuve($values, $prop, $disk = 'public', $folder = 'avatars');
+    public function replaceBase64WithFilePathValuesRecursive(
+        IProfileUser $user,
+        string $title,
+        array $values,
+        string|null $prop,
+        int $access,
+        string $disk,
+        string $folder,
+    );
 }

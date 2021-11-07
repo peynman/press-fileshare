@@ -4,6 +4,7 @@ namespace Larapress\FileShare\Services\FileUpload;
 
 use Carbon\Carbon;
 use Exception;
+use GdImage;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -76,7 +77,7 @@ class FileUploadService implements IFileUploadService
     public function getUploadExtension(FileUpload $upload)
     {
         $dotIndex = strripos($upload->filename, '.');
-        return Str::substr($upload->filename, $dotIndex + 1, );
+        return Str::substr($upload->filename, $dotIndex + 1,);
     }
 
     /**
@@ -99,7 +100,7 @@ class FileUploadService implements IFileUploadService
                 throw new AppException(AppException::ERR_OBJECT_NOT_FOUND);
             }
         }
-        $mime = $file->getClientOriginalExtension();
+        $mime = Str::lower($file->getClientOriginalExtension());
         /** @var FileUpload */
         $link = null;
         switch ($mime) {
@@ -177,12 +178,14 @@ class FileUploadService implements IFileUploadService
                 }
         }
 
-        $processors = config('larapress.fileshare.file_upload_processors');
-        foreach ($processors as $pClass) {
-            /** @var IFileUploadProcessor */
-            $processor = new $pClass();
-            if ($processor->shouldProcessFile($link)) {
-                $processor->postProcessFile($request, $link);
+        if (!is_null($link)) {
+            $processors = config('larapress.fileshare.file_upload_processors');
+            foreach ($processors as $pClass) {
+                /** @var IFileUploadProcessor */
+                $processor = new $pClass();
+                if ($processor->shouldProcessFile($link)) {
+                    $processor->postProcessFile($request, $link);
+                }
             }
         }
 
@@ -351,39 +354,6 @@ class FileUploadService implements IFileUploadService
     /**
      * Undocumented function
      *
-     * @param string $encoded
-     * @param string $storage
-     * @param string $folder
-     * @return bool
-     */
-    public function saveBase64Image($encoded, $storage, $folder)
-    {
-        if (Str::startsWith($encoded, 'data:image/png;base64,')) {
-            $base64 = substr($encoded, strlen('data:image\/png;base64,') - 1);
-        } else {
-            $base64 = $encoded;
-        }
-        $imgBin = base64_decode($base64);
-        $img = imagecreatefromstring($imgBin);
-        if (!$img) {
-            return false;
-        }
-        $temp = '/tmp/profile.png';
-        $random = Helpers::randomString(20);
-        $filename = 'images/' . $folder . '/' . $random . '.png';
-        if (imagepng($img, $temp, 0)) {
-            $content = file_get_contents($temp);
-            Storage::disk($storage)->put($filename, $content);
-        }
-        imagedestroy($img);
-
-        return $filename;;
-    }
-
-
-    /**
-     * Undocumented function
-     *
      * @param Request $request
      * @param int $fileId
      * @return void
@@ -418,175 +388,6 @@ class FileUploadService implements IFileUploadService
     }
 
     /**
-     * @param UploadedFile     $upload
-     * @param string           $title
-     * @param string           $mime
-     * @param string           $location
-     * @param string           $disk
-     *
-     * @return FileUpload
-     * @throws AppException
-     */
-    protected function makeLinkFromImageUpload(
-        IProfileUser $user,
-        UploadedFile $upload,
-        FileUpload|null $existing,
-        string $title,
-        string $mime,
-        string $location,
-        string $disk,
-        int $access,
-        array|null $data,
-    ) {
-        $image      = $upload;
-        $fileName   = Helpers::randomString(10) . '.' . $image->getClientOriginalExtension();
-        $path = '/' . trim($location, '/') . '/' . trim($fileName, '/');
-
-        /** @var InterventionImage $img */
-        $img = Image::make($image->getRealPath());
-        $img->stream(); // <-- Key point
-        if (Storage::disk($disk)->put($path, $img, [$disk])) {
-            $fileSize = $upload->getSize();
-            $width = $img->getWidth();
-            $height = $img->getHeight();
-
-            if (is_null($existing)) {
-                $fileUpload = FileUpload::create([
-                    'uploader_id' => $user->id,
-                    'title' => $title,
-                    'mime' => $mime,
-                    'path' => $path,
-                    'filename' => $fileName,
-                    'storage' => $disk,
-                    'access' => $access,
-                    'size' => $fileSize,
-                    'data' => array_merge([
-                        'dimentions' => [
-                            'width' => $width,
-                            'height' => $height,
-                        ],
-                    ], is_null($data) ? [] : $data),
-                ]);
-            } else {
-                $fileUpload = $existing;
-                $fileUpload->update([
-                    'uploader_id' => $user->id,
-                    'title' => $title,
-                    'mime' => $mime,
-                    'path' => $path,
-                    'filename' => $fileName,
-                    'storage' => $disk,
-                    'access' => $access === 'private' ? 0 : 1,
-                    'size' => $fileSize,
-                    'data' => array_merge([
-                        'dimentions' => [
-                            'width' => $width,
-                            'height' => $height,
-                        ],
-                    ], is_null($data) ? [] : $data),
-                ]);
-            }
-
-            CRUDVerbEvent::dispatch($user, $fileUpload, FileUploadCRUDProvider::class, Carbon::now(), 'upload');
-
-            return $fileUpload;
-        }
-
-        throw new AppException(AppException::ERR_UNEXPECTED_RESULT);
-    }
-
-    /**
-     * @param string           $localPath
-     * @param string           $title
-     * @param string           $mime
-     * @param string           $location
-     * @param string           $disk
-     *
-     * @return FileUpload
-     * @throws AppException
-     */
-    protected function makeLinkFromImageLocal(
-        IProfileUser $user,
-        string $localPath,
-        FileUpload|null $existing,
-        string $title,
-        string $mime,
-        string $extension,
-        string $location,
-        string $disk,
-        int $access,
-        array|null $data,
-    ) {
-        $fileName   = Helpers::randomString(10) . '.' . $extension;
-        $path = '/' . trim($location, '/') . '/' . trim($fileName, '/');
-
-        /** @var InterventionImage $img */
-        $img = Image::make($localPath);
-        $img->stream(); // <-- Key point
-        if (Storage::disk($disk)->put($path, $img, [$disk])) {
-            $width = $img->getWidth();
-            $height = $img->getHeight();
-            $fileSize = Storage::disk($disk)->size($path);
-
-            if (is_null($existing)) {
-                $fileUpload = FileUpload::create([
-                    'uploader_id' => $user->id,
-                    'title' => $title,
-                    'mime' => $mime,
-                    'path' => $path,
-                    'filename' => $fileName,
-                    'storage' => $disk,
-                    'access' => $access,
-                    'size' => $fileSize,
-                    'data' => array_merge([
-                        'dimentions' => [
-                            'width' => $width,
-                            'height' => $height,
-                        ],
-                    ], is_null($data) ? [] : $data),
-                ]);
-            } else {
-                $fileUpload = $existing;
-                $fileUpload->update([
-                    'uploader_id' => $user->id,
-                    'title' => $title,
-                    'mime' => $mime,
-                    'path' => $path,
-                    'filename' => $fileName,
-                    'storage' => $disk,
-                    'access' => $access === 'private' ? 0 : 1,
-                    'size' => $fileSize,
-                    'data' => array_merge([
-                        'dimentions' => [
-                            'width' => $width,
-                            'height' => $height,
-                        ],
-                    ], is_null($data) ? [] : $data),
-                ]);
-            }
-
-            CRUDVerbEvent::dispatch($user, $fileUpload, FileUploadCRUDProvider::class, Carbon::now(), 'upload');
-
-            return $fileUpload;
-        }
-
-        throw new AppException(AppException::ERR_UNEXPECTED_RESULT);
-    }
-
-    /**
-     * Undocumented function
-     *
-     * @param InterventionImage $image
-     * @param string $location
-     * @param string $filename
-     *
-     * @return string[]
-     */
-    protected function makeImageThumbnails(InterventionImage $image, $location, $filename, $disk, $access)
-    {
-    }
-
-    /**
      * @param UploadedFile $upload
      * @param string       $title
      * @param string       $mime
@@ -608,7 +409,7 @@ class FileUploadService implements IFileUploadService
         int $access,
         array|null $data,
     ) {
-        $filename   = time() . '.' . Helpers::randomString(10) . '.' . $upload->getClientOriginalExtension();
+        $filename   = time() . '.' . Helpers::randomString(10) . '.' . Str::lower($upload->getClientOriginalExtension());
         $stream = Storage::disk('local')->readStream('plupload/' . $upload->getFilename());
         $path = '/' . trim($location, '/') . '/' . $filename;
         if (Storage::disk($disk)->put($path, $stream)) {
@@ -713,6 +514,245 @@ class FileUploadService implements IFileUploadService
         throw new AppException(AppException::ERR_UNEXPECTED_RESULT);
     }
 
+    /**
+     * @param UploadedFile     $upload
+     * @param string           $title
+     * @param string           $mime
+     * @param string           $location
+     * @param string           $disk
+     *
+     * @return FileUpload
+     * @throws AppException
+     */
+    protected function makeLinkFromImageUpload(
+        IProfileUser $user,
+        UploadedFile $upload,
+        FileUpload|null $existing,
+        string $title,
+        string $mime,
+        string $location,
+        string $disk,
+        int $access,
+        array|null $data,
+    ) {
+        $image      = $upload;
+        $fileName   = Helpers::randomString(10) . '.' . Str::lower($image->getClientOriginalExtension());
+        $path = '/' . trim($location, '/') . '/' . trim($fileName, '/');
+
+        /** @var InterventionImage $img */
+        $img = Image::make($image->getRealPath());
+        $img->stream(); // <-- Key point
+        if (Storage::disk($disk)->put($path, $img)) {
+            $fileSize = $upload->getSize();
+            $width = $img->getWidth();
+            $height = $img->getHeight();
+
+            if (is_null($existing)) {
+                $fileUpload = FileUpload::create([
+                    'uploader_id' => $user->id,
+                    'title' => $title,
+                    'mime' => $mime,
+                    'path' => $path,
+                    'filename' => $fileName,
+                    'storage' => $disk,
+                    'access' => $access,
+                    'size' => $fileSize,
+                    'data' => array_merge([
+                        'dimentions' => [
+                            'width' => $width,
+                            'height' => $height,
+                        ],
+                    ], is_null($data) ? [] : $data),
+                ]);
+            } else {
+                $fileUpload = $existing;
+                $fileUpload->update([
+                    'uploader_id' => $user->id,
+                    'title' => $title,
+                    'mime' => $mime,
+                    'path' => $path,
+                    'filename' => $fileName,
+                    'storage' => $disk,
+                    'access' => $access === 'private' ? 0 : 1,
+                    'size' => $fileSize,
+                    'data' => array_merge([
+                        'dimentions' => [
+                            'width' => $width,
+                            'height' => $height,
+                        ],
+                    ], is_null($data) ? [] : $data),
+                ]);
+            }
+
+            CRUDVerbEvent::dispatch($user, $fileUpload, FileUploadCRUDProvider::class, Carbon::now(), 'upload');
+
+            return $fileUpload;
+        }
+
+        throw new AppException(AppException::ERR_UNEXPECTED_RESULT);
+    }
+
+    /**
+     * @param string           $localPath
+     * @param string           $title
+     * @param string           $mime
+     * @param string           $location
+     * @param string           $disk
+     *
+     * @return FileUpload
+     * @throws AppException
+     */
+    protected function makeLinkFromImageLocal(
+        IProfileUser $user,
+        string $localPath,
+        FileUpload|null $existing,
+        string $title,
+        string $mime,
+        string $extension,
+        string $location,
+        string $disk,
+        int $access,
+        array|null $data,
+    ) {
+        $fileName   = Helpers::randomString(10) . '.' . $extension;
+        $path = '/' . trim($location, '/') . '/' . trim($fileName, '/');
+
+        /** @var InterventionImage $img */
+        $img = Image::make($localPath);
+        $img->stream(); // <-- Key point
+        if (Storage::disk($disk)->put($path, $img)) {
+            $width = $img->getWidth();
+            $height = $img->getHeight();
+            $fileSize = Storage::disk($disk)->size($path);
+
+            if (is_null($existing)) {
+                $fileUpload = FileUpload::create([
+                    'uploader_id' => $user->id,
+                    'title' => $title,
+                    'mime' => $mime,
+                    'path' => $path,
+                    'filename' => $fileName,
+                    'storage' => $disk,
+                    'access' => $access,
+                    'size' => $fileSize,
+                    'data' => array_merge([
+                        'dimentions' => [
+                            'width' => $width,
+                            'height' => $height,
+                        ],
+                    ], is_null($data) ? [] : $data),
+                ]);
+            } else {
+                $fileUpload = $existing;
+                $fileUpload->update([
+                    'uploader_id' => $user->id,
+                    'title' => $title,
+                    'mime' => $mime,
+                    'path' => $path,
+                    'filename' => $fileName,
+                    'storage' => $disk,
+                    'access' => $access === 'private' ? 0 : 1,
+                    'size' => $fileSize,
+                    'data' => array_merge([
+                        'dimentions' => [
+                            'width' => $width,
+                            'height' => $height,
+                        ],
+                    ], is_null($data) ? [] : $data),
+                ]);
+            }
+
+            CRUDVerbEvent::dispatch($user, $fileUpload, FileUploadCRUDProvider::class, Carbon::now(), 'upload');
+
+            return $fileUpload;
+        }
+
+        throw new AppException(AppException::ERR_UNEXPECTED_RESULT);
+    }
+
+    /**
+     * Undocumented function
+     *
+     * @param IProfileUser $user
+     * @param string $encoded
+     * @param string $storage
+     * @param string $folder
+     * @param array $data
+     *
+     * @return FileUpload
+     */
+    public function saveBase64Image(
+        IProfileUser $user,
+        string
+        $title,
+        string $encoded,
+        string $location,
+        string $disk,
+        int $access,
+        array|null $data
+    ) {
+        if (Str::startsWith($encoded, 'data:image/png;base64,')) {
+            $base64 = substr($encoded, strlen('data:image\/png;base64,') - 1);
+        } else {
+            $base64 = $encoded;
+        }
+        $imgBin = base64_decode($base64);
+        /** @var GdImage */
+        $img = imagecreatefromstring($imgBin);
+        if (!$img) {
+            return false;
+        }
+        $temp = '/tmp/' . Helpers::randomString(20) . '.png';
+        $fileName = Helpers::randomString(20) . '.png';
+        $path = '/' . trim($location, '/') . '/' . trim($fileName, '/');
+        $fileUpload = null;
+
+        if (imagepng($img, $temp, 0)) {
+            $content = file_get_contents($temp);
+            $fileSize = filesize($temp);
+            $width = imagesx($img);
+            $height = imagesy($img);
+
+            if (Storage::disk($disk)->put($path, $content)) {
+                $fileUpload = FileUpload::create([
+                    'uploader_id' => $user->id,
+                    'title' => $title,
+                    'mime' => 'image/png',
+                    'path' => $path,
+                    'filename' => $fileName,
+                    'storage' => $disk,
+                    'access' => $access,
+                    'size' => $fileSize,
+                    'data' => array_merge([
+                        'dimentions' => [
+                            'width' => $width,
+                            'height' => $height,
+                        ],
+                    ], is_null($data) ? [] : $data),
+                ]);
+
+                CRUDVerbEvent::dispatch($user, $fileUpload, FileUploadCRUDProvider::class, Carbon::now(), 'upload');
+            }
+        }
+
+        if (!is_null($fileUpload)) {
+            $processors = config('larapress.fileshare.file_upload_processors');
+            foreach ($processors as $pClass) {
+                /** @var IFileUploadProcessor */
+                $processor = new $pClass();
+                if ($processor->shouldProcessFile($fileUpload)) {
+                    $processor->postProcessFile(Request::create('', 'POST', [
+                        'auto_start' => true,
+                    ]), $fileUpload);
+                }
+            }
+        }
+
+        imagedestroy($img);
+        unlink($temp);
+
+        return $fileUpload;;
+    }
 
     /**
      * Undocumented function
@@ -723,17 +763,33 @@ class FileUploadService implements IFileUploadService
      * @param string $folder
      * @return array
      */
-    public function replaceBase64WithFilePathValuesRecursuve($values, $prop, $disk = 'public', $folder = 'avatars')
-    {
-        /** @var IFileUploadService */
-        $this->fileService = app(IFileUploadService::class);
-        $traverse = function ($inputs, $prop, $traverse) use ($disk, $folder) {
+    public function replaceBase64WithFilePathValuesRecursive(
+        IProfileUser $user,
+        string $title,
+        array $values,
+        string|null $prop,
+        int $access = FileUpload::ACCESS_PUBLIC,
+        string $disk = 'public',
+        string $folder = 'images',
+    ) {
+        $traverse = function ($inputs, $prop, $traverse) use ($user, $title, $access, $disk, $folder) {
             foreach ($inputs as $p => $v) {
                 if (is_string($v) && (is_null($prop) || Str::startsWith($p, $prop) || Str::endsWith($p, $prop))) {
                     if (Str::startsWith($inputs[$p], 'data:image/png;base64,')) {
                         try {
-                            $filepath = $this->fileService->saveBase64Image($inputs[$p], $disk, $folder);
-                            $inputs[$p] = '/storage/' . $filepath;
+                            /** @var FileUpload */
+                            $fileUpload = $this->saveBase64Image(
+                                $user,
+                                $title,
+                                $inputs[$p],
+                                $folder,
+                                $disk,
+                                $access,
+                                null
+                            );
+                            if (!is_null($fileUpload)) {
+                                $inputs[$p] = '/storage' . $fileUpload->path;
+                            }
                         } catch (Exception $e) {
                             Log::critical('Failed auto saving base64 image form: ' . $e->getMessage(), $e->getTrace());
                         }
